@@ -1,0 +1,892 @@
+{
+  "info": {
+    "name": "Node Development Test - Clean Review",
+    "description": "Import this v2.1 collection and the accompanying Local Review environment. Select that environment and set base_url to a private local server. Run the Local assessment folder: signup generates fresh disposable credentials, login saves JWT, and CRUD captures its own ID. For the full reset sequence, launch the server locally with NODE_ENV=development and ALLOW_DEV_RESET_TOKEN=true; only loopback requests can receive tokens. Without that opt-in the reset and new-password requests are skipped, not passed. Production never returns reset tokens. No recovery email is implemented. Do not run this local test flow against production. All Shopify requests are disabled by default: set run_shopify_reads=true for reads. For EACH individual authorized Shopify write, set allow_shopify_mutations=true immediately before sending; the pre-request guard resets it to false. Run these writes individually, never as an unattended collection. Use only a disposable development product and its numeric ID. Never publish an environment after a run without clearing all credentials, JWTs, reset tokens and IDs. Flags in the Postman environment do not configure the server. Password reset invalidates all earlier JWTs. Login with the new password to continue protected requests. Authentication attempts are limited per IP per 15 minutes (signup 20, login 30, forgot 10, reset 20); 429 includes Retry-After.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{jwt_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Local assessment",
+      "item": [
+        {
+          "name": "Server status",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('JSON response', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));",
+                  "pm.test('Success flag', () => pm.expect(pm.response.json().success).to.eql(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": "{{base_url}}/"
+          },
+          "response": []
+        },
+        {
+          "name": "Signup reviewer",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Generate disposable local credentials for each collection run. Use a separate manual request for an existing account.",
+                  "const runId = pm.variables.replaceIn('{{$guid}}');",
+                  "pm.environment.set('email', 'reviewer-' + runId + '@example.com');",
+                  "pm.environment.set('password', 'Review-' + pm.variables.replaceIn('{{$guid}}'));",
+                  "pm.environment.set('new_password', 'Reset-' + pm.variables.replaceIn('{{$guid}}'));",
+                  "['jwt_token', 'reset_token', 'product_id'].forEach(key => pm.environment.unset(key));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.test('JSON response', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));",
+                  "pm.test('Success flag', () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.test('Safe user response', () => { const u = pm.response.json().user; pm.expect(u.id).to.be.a('number'); pm.expect(u).not.to.have.property('password'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Reviewer\",\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/auth/signup"
+          },
+          "response": []
+        },
+        {
+          "name": "Login reviewer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('JSON response', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));",
+                  "pm.test('Success flag', () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.test('JWT present', () => pm.expect(pm.response.json().token).to.be.a('string').and.not.empty);",
+                  "if (pm.response.code === 200) pm.environment.set('jwt_token', pm.response.json().token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/auth/login"
+          },
+          "response": []
+        },
+        {
+          "name": "Create local product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.test('JSON response', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));",
+                  "pm.test('Success flag', () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.test('Saved fields', () => { const p = pm.response.json().product; pm.expect(p.id).to.be.a('number'); pm.expect(p.price).to.eql(12.5); pm.expect(p.stock).to.eql(3); });",
+                  "if (pm.response.code === 201) pm.environment.set('product_id', pm.response.json().product.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Reviewer product\",\n  \"description\": \"Temporary local test\",\n  \"price\": 12.5,\n  \"stock\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/products"
+          },
+          "response": []
+        },
+        {
+          "name": "List local products",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('JSON response', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));",
+                  "pm.test('Success flag', () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.test('Products array', () => pm.expect(pm.response.json().products).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/products"
+          },
+          "response": []
+        },
+        {
+          "name": "Read local product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('JSON response', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));",
+                  "pm.test('Success flag', () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.test('Matching ID', () => pm.expect(pm.response.json().product.id).to.eql(Number(pm.environment.get('product_id'))));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/products/{{product_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Update local product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('JSON response', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));",
+                  "pm.test('Success flag', () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.test('Updated fields', () => { pm.expect(pm.response.json().product.name).to.eql('Updated reviewer product'); pm.expect(pm.response.json().product.stock).to.eql(4); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated reviewer product\",\n  \"description\": \"Temporary local test\",\n  \"price\": 12.5,\n  \"stock\": 4\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/products/{{product_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Reject negative price",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+                  "pm.test('JSON response', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));",
+                  "pm.test('Success flag', () => pm.expect(pm.response.json().success).to.eql(false));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Reviewer product\",\n  \"description\": \"Temporary local test\",\n  \"price\": -1,\n  \"stock\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/products"
+          },
+          "response": []
+        },
+        {
+          "name": "Reject fractional stock",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+                  "pm.test('JSON response', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));",
+                  "pm.test('Success flag', () => pm.expect(pm.response.json().success).to.eql(false));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Reviewer product\",\n  \"description\": \"Temporary local test\",\n  \"price\": 12.5,\n  \"stock\": 1.5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/products"
+          },
+          "response": []
+        },
+        {
+          "name": "Reject missing JWT",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 401', () => pm.response.to.have.status(401));",
+                  "pm.test('JSON response', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));",
+                  "pm.test('Success flag', () => pm.expect(pm.response.json().success).to.eql(false));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Reviewer product\",\n  \"description\": \"Temporary local test\",\n  \"price\": 12.5,\n  \"stock\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/products"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete local product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('JSON response', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));",
+                  "pm.test('Success flag', () => pm.expect(pm.response.json().success).to.eql(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base_url}}/products/{{product_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Deleted local product is missing",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 404', () => pm.response.to.have.status(404));",
+                  "pm.test('JSON response', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));",
+                  "pm.test('Success flag', () => pm.expect(pm.response.json().success).to.eql(false));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/products/{{product_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Request password reset",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.unset('reset_token');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('JSON response', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));",
+                  "pm.test('Success flag', () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "if (pm.response.code === 200 && pm.response.json().resetToken) {",
+                  "  pm.test('Development token format', () => pm.expect(pm.response.json().resetToken).to.match(/^[a-f0-9]{64}$/));",
+                  "  pm.environment.set('reset_token', pm.response.json().resetToken);",
+                  "} else {",
+                  "  pm.environment.unset('reset_token');",
+                  "  pm.test('No reset token exposed', () => pm.expect(pm.response.json()).not.to.have.property('resetToken'));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/auth/forgot-password"
+          },
+          "response": []
+        },
+        {
+          "name": "Reset password (local opt-in required)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('reset_completed', false);",
+                  "if (!pm.environment.get('reset_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('JSON response', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));",
+                  "pm.test('Success flag', () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "if (pm.response.code === 200) pm.variables.set('reset_completed', true);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{reset_token}}\",\n  \"newPassword\": \"{{new_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/auth/reset-password"
+          },
+          "response": []
+        },
+        {
+          "name": "Old JWT rejected after reset",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reset_completed')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Controlled rejection', () => pm.expect(pm.response.json().success).to.eql(false));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/products"
+          },
+          "response": []
+        },
+        {
+          "name": "Reject reset token reuse",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('reset_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+                  "pm.test('JSON response', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));",
+                  "pm.test('Success flag', () => pm.expect(pm.response.json().success).to.eql(false));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{reset_token}}\",\n  \"newPassword\": \"{{new_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/auth/reset-password"
+          },
+          "response": []
+        },
+        {
+          "name": "Login with new password",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('reset_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('JSON response', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));",
+                  "pm.test('Success flag', () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "if (pm.response.code === 200) pm.environment.set('jwt_token', pm.response.json().token);",
+                  "pm.environment.unset('reset_token');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{new_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/auth/login"
+          },
+          "response": []
+        },
+        {
+          "name": "New JWT reaches protected product validation",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reset_completed')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Controlled rejection', () => pm.expect(pm.response.json().success).to.eql(false));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/products"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Shopify - manual opt-in only",
+      "description": "Every mutation requires a fresh one-request allow_shopify_mutations=true environment opt-in. All are skipped by default.",
+      "item": [
+        {
+          "name": "Shopify list products",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.environment.get('run_shopify_reads') !== 'true') pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('JSON response', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));",
+                  "pm.test('Success flag', () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.test('Products array and count', () => { const b = pm.response.json(); pm.expect(b.products).to.be.an('array'); pm.expect(b.count).to.eql(b.products.length); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/shopify/products"
+          },
+          "response": []
+        },
+        {
+          "name": "Shopify create product - explicit opt-in",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Explicit one-request opt-in. Default collection runs skip all Shopify writes.",
+                  "if (pm.environment.get('allow_shopify_mutations') !== 'true') {",
+                  "  pm.execution.skipRequest();",
+                  "} else {",
+                  "  pm.environment.set('allow_shopify_mutations', 'false');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.test('JSON response', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));",
+                  "pm.test('Success flag', () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.test('Shopify product GID', () => pm.expect(pm.response.json().product.id).to.match(new RegExp('^gid://shopify/Product/[1-9][0-9]*$')));",
+                  "if (pm.response.code === 201) pm.environment.set('shopify_product_id', pm.response.json().product.id.split('/').pop());"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Reviewer disposable development product\",\n  \"description\": \"Created only with explicit reviewer permission\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/shopify/products"
+          },
+          "response": []
+        },
+        {
+          "name": "Shopify update product - explicit opt-in",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Explicit one-request opt-in. Default collection runs skip all Shopify writes.",
+                  "if (pm.environment.get('allow_shopify_mutations') !== 'true') {",
+                  "  pm.execution.skipRequest();",
+                  "} else {",
+                  "  pm.environment.set('allow_shopify_mutations', 'false');",
+                  "}",
+                  "if (!/^[1-9][0-9]*$/.test(pm.environment.get('shopify_product_id') || '')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('JSON response', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));",
+                  "pm.test('Success flag', () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.test('Updated title', () => pm.expect(pm.response.json().product.title).to.eql('Updated disposable development product'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated disposable development product\",\n  \"description\": \"Reviewer-approved update\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/shopify/products/{{shopify_product_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Shopify delete product - explicit opt-in",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Explicit one-request opt-in. Default collection runs skip all Shopify writes.",
+                  "if (pm.environment.get('allow_shopify_mutations') !== 'true') {",
+                  "  pm.execution.skipRequest();",
+                  "} else {",
+                  "  pm.environment.set('allow_shopify_mutations', 'false');",
+                  "}",
+                  "if (!/^[1-9][0-9]*$/.test(pm.environment.get('shopify_product_id') || '')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('JSON response', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));",
+                  "pm.test('Success flag', () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.test('Deleted ID', () => pm.expect(pm.response.json().deletedProductId).to.eql('gid://shopify/Product/' + pm.environment.get('shopify_product_id')));",
+                  "if (pm.response.code === 200) pm.environment.unset('shopify_product_id');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base_url}}/shopify/products/{{shopify_product_id}}"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
