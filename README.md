@@ -1,74 +1,266 @@
-# Node.js Development Test — Product CRUD Manager
+<div align="center">
 
-Developed by Iqra Nawaz. Express 5, SQLite (better-sqlite3), bcrypt, JWT and Shopify GraphQL Admin API. This is a single-store API integration; it has no merchant-facing UI or multi-store installation flow.
+# 🛍️ Node.js × Shopify Product Management API
 
-## Setup
+### From local CRUD to real Shopify integration — one secure Express backend.
 
-1. On Windows x64, use Node.js **24.21.0** and npm **11.19.0** (the verified versions) and open a terminal in the extracted project folder.
-2. Run `npm ci --ignore-scripts` using the included, unchanged lockfile. See the native-installation explanation and smoke test below; plain `npm ci` can unnecessarily invoke native build tools with this dependency/npm combination.
-3. Copy `.env.example` to `.env`. Replace the JWT placeholder with your own random secret of at least 32 characters; never share the file. Configure Shopify credentials and use only the shop slug in `SHOPIFY_SHOP`, without `.myshopify.com`.
-4. Run `node server.js`. The default URL is `http://127.0.0.1:3000`; `PORT` can override it.
+**Built by Iqra Nawaz**
 
-### Tested Windows installation procedure
+![Node.js](https://img.shields.io/badge/Node.js-24.21.0-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
+![Express](https://img.shields.io/badge/Express-5-111111?style=for-the-badge&logo=express&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JavaScript-ES202x-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
+![SQLite](https://img.shields.io/badge/SQLite-better--sqlite3-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
+![Shopify](https://img.shields.io/badge/Shopify-GraphQL%20Admin%20API-7AB55C?style=for-the-badge&logo=shopify&logoColor=white)
+![Postman](https://img.shields.io/badge/Tested%20with-Postman-FF6C37?style=for-the-badge&logo=postman&logoColor=white)
 
-Prerequisites: Windows x64, the Node/npm versions above, and access to the npm registry (or an approved registry mirror containing the locked packages). Install into a newly extracted folder; do not copy another project's `node_modules`. The verified prebuilt path does not require Python, Visual Studio Build Tools or a Windows SDK.
+**REST APIs** · **JWT authentication** · **Product CRUD** · **SQLite** · **Shopify GraphQL** · **Security middleware**
+
+[Overview](#-overview) • [Features](#-features) • [Architecture](#-architecture) • [Quick Start](#-quick-start) • [API Reference](#-api-reference) • [Postman](#-postman-testing) • [Security](#-security--reliability)
+
+</div>
+
+---
+
+## ✨ Overview
+
+A backend-focused product management project that brings together **two independent product workflows**:
+
+- **Local product management:** create, retrieve, update, and delete products stored in SQLite.
+- **Shopify product management:** use protected Express routes to perform product operations against an authorized Shopify development store through the **GraphQL Admin API**.
+
+The project also includes user registration, login, expiring JWTs, password hashing, controlled password recovery, request logging, input validation, and auth rate limiting.
+
+> 💡 **Built to learn by doing:** from REST endpoints and database queries to external API authentication and real-world error handling.
+
+> **Scope:** This is a **single-store backend API integration**, not an embedded Shopify admin app, merchant-facing dashboard, or multi-store OAuth installation flow. Local SQLite and Shopify products are **not automatically synchronized**.
+
+## 🚀 Features
+
+| Area | What's implemented |
+|---|---|
+| 🧩 Local Product CRUD | Create, list, retrieve, update, and delete products |
+| 🛒 Shopify Integration | Read up to 20 products; create draft products; update title/description; delete products |
+| 🔐 User Authentication | Signup, login, bcrypt password hashing, HS256 JWTs |
+| 🔑 Password Recovery | Expiring, single-use reset tokens; token hashing; invalidation of older JWTs |
+| 🧱 Validation | Data type, length, price, stock, and ID checks |
+| 🛡️ API Security | Protected write operations, authentication rate limits, safe error responses |
+| 📝 Logging | HTTP method and URL logging with query values redacted |
+| 🧪 API Testing | Importable Postman collection with validation and lifecycle checks |
+| 💾 Persistence | SQLite tables and additive database migrations |
+
+## 🏗️ Architecture
+
+```mermaid
+flowchart TD
+    P[Postman / API client] --> E[Express server • server.js]
+    E --> M[Middleware: logging, JSON, JWT, validation, rate limits]
+    M --> L[Local product & auth routes]
+    M --> S[Shopify routes]
+    L --> D[(SQLite • products / users / resets)]
+    S --> G[shopify.js • GraphQL Admin API]
+    G --> H[(Shopify development store)]
+```
+
+**How it works:** a client sends a request → Express applies the appropriate middleware and validation → the route accesses **SQLite** or **Shopify** → a JSON response and HTTP status code are returned.
+
+### 🗂️ Project structure
+
+```text
+.
+├── server.js                    # Express app, API routes, auth and reset flows
+├── database.js                  # SQLite schema and migrations
+├── shopify.js                   # Shopify token exchange and GraphQL client
+├── request-security.js          # URL-safe logging and authentication rate limits
+├── test-shopify.js              # Live Shopify authentication/read check
+├── postman/
+│   ├── My Collection.postman_collection.json
+│   └── Local Review.postman_environment.json
+├── .env.example                 # Safe configuration template
+├── .gitignore
+├── package.json
+├── package-lock.json
+└── README.md
+```
+
+> `products.db`, `.env`, and `node_modules/` are created or configured locally and should **never** be committed with private data.
+
+## 🖼️ Project snapshots
+
+Add your own screenshots here after checking that they contain **no JWTs, passwords, API keys, tokens, or personal account details**.
+
+| API in action | Shopify products |
+|---|---|
+| *Postman: successful local Product CRUD response* | *Shopify Admin: development store's Products page* |
+
+<!-- Optional: once you add sanitized screenshots into docs/screenshots/, replace the captions above with:
+![Postman API response](docs/screenshots/postman-crud.png)
+![Shopify products](docs/screenshots/shopify-products.png)
+Do not use these image paths until the files exist.
+-->
+
+## ⚡ Quick Start
+
+### Requirements
+
+- **Windows x64** — verified with **Node.js 24.21.0** and **npm 11.19.0**.
+- An authorized **Shopify development store** and app credentials (currently required by startup configuration, even for local-only requests).
+- Product scopes: `read_products` and `write_products` for live Shopify operations.
+
+### 1. Install dependencies
 
 ```powershell
 node --version
 npm --version
 npm ci --ignore-scripts
+```
+
+**Why `--ignore-scripts`?** On the verified Windows x64 configuration, the locked `better-sqlite3@13.0.3` package can trigger an unnecessary `node-gyp` rebuild during plain `npm ci`, which may require a Windows SDK. The locked `better-sqlite3` and `bcrypt@6.0.0` packages ship compatible Windows x64 prebuilt binaries; the installation and native functionality were verified in a fresh directory. **This is a version/platform-specific workaround, not a universal installation recommendation.** Keep the lockfile unchanged and perform the smoke test below.
+
+```powershell
 node -e "const Database=require('better-sqlite3'); const db=new Database(':memory:'); if(db.prepare('SELECT 1 AS ok').get().ok!==1) process.exit(1); db.close(); const bcrypt=require('bcrypt'); const hash=bcrypt.hashSync('temporary-native-check',12); if(!bcrypt.compareSync('temporary-native-check',hash)||bcrypt.compareSync('wrong-password',hash)) process.exit(1); console.log('SQLite and bcrypt native checks passed');"
+```
+
+If native packages fail to load, **do not assume installation succeeded**. A source build requires compatible Python and Visual Studio Build Tools with C++ and Windows SDK components; that path was not verified for this project. See [better-sqlite3 issue #1516](https://github.com/WiseLibs/better-sqlite3/issues/1516).
+
+### 2. Configure environment
+
+```powershell
 Copy-Item .env.example .env
-# Configure the new .env with your own credentials before starting.
+notepad .env
+```
+
+Fill in a **new random JWT secret (at least 32 characters)** and your own Shopify credentials. The configuration includes:
+
+```dotenv
+NODE_ENV=development
+JWT_SECRET=replace_with_a_long_random_secret
+SHOPIFY_SHOP=your-shop-slug
+SHOPIFY_CLIENT_ID=your-client-id
+SHOPIFY_CLIENT_SECRET=your-client-secret
+```
+
+Use only the store **slug** for `SHOPIFY_SHOP`, not the full `.myshopify.com` host. Refer to `.env.example` for all supported variables. **Never publish `.env`.** Do not overwrite an existing `.env` when updating the project.
+
+Shopify's client-credentials grant applies to appropriately authorized same-organization stores: [Shopify setup documentation](https://shopify.dev/docs/apps/build/authentication-authorization/client-credentials-grant?lang=node).
+
+### 3. Start the API
+
+```powershell
 node server.js
 ```
 
-Copy the template only on a fresh installation; do not overwrite an existing `.env`. Configure Shopify credentials as described below. Starting the server initializes SQLite automatically; the original developer database is not needed. For local assessment tests, follow the development reset and Postman sections below.
+By default the API runs at **`http://127.0.0.1:3000`** (`PORT` can override it). Test with `GET /` in a browser or Postman. Startup creates `products.db` and applies additive migrations; **back up any existing database before deployment**.
 
-### Why installation scripts are skipped for this lockfile
+## 📚 API Reference
 
-The locked native dependencies are `better-sqlite3@13.0.3` (Node >=22) and `bcrypt@6.0.0` (Node >=18). Both package tarballs include Windows x64 native binaries. SQLite loads `better-sqlite3/prebuilds/win32-x64.node`; bcrypt loads `bcrypt/prebuilds/win32-x64/bcrypt.node`. bcrypt's normal install script is `node-gyp-build`; skipping it does not disable runtime password hashing when its bundled binary loads.
+### Local products
 
-In the tested npm 11.19.0 lockfile-driven install, better-sqlite3's `gypfile: false` is absent from the in-memory lockfile package metadata. npm detects `binding.gyp` and synthesizes `node-gyp rebuild`, despite the package's bundled prebuild. node-gyp then tries to configure a compiler toolchain; the plain installation failed because this machine lacks a Windows SDK. This is an installation/toolchain issue, not evidence that SQLite needs to be removed. A matching upstream report is [better-sqlite3 issue #1516](https://github.com/WiseLibs/better-sqlite3/issues/1516).
+| Method | Route | Auth | Purpose |
+|---|---|---|---|
+| `GET` | `/` | Public | Health / server status |
+| `POST` | `/products` | JWT | Create product — `201` |
+| `GET` | `/products` | Public | List products — `200` |
+| `GET` | `/products/:id` | Public | Retrieve product — `200` or `404` |
+| `PUT` | `/products/:id` | JWT | Replace product fields — `200` |
+| `DELETE` | `/products/:id` | JWT | Delete product — `200` |
 
-The prebuilt procedure was tested in a fresh directory with its **own initially empty npm cache**. Logs confirmed fresh registry downloads. The loaded native files matched binaries in independently downloaded tarballs whose integrity matched `package-lock.json`. SQLite create/insert/reopen and bcrypt cost-12 hash/correct-password/wrong-password checks passed. This did not depend on copying cached builds or the developer's installed modules.
+Example request body:
 
-`--ignore-scripts` skips all dependency lifecycle scripts for that installation. It is appropriate here only because this exact locked dependency set and its native binaries were exercised; do not set it globally or assume it works after changing dependencies. Keep `package-lock.json` and run the smoke test above. Verification covers this Windows x64 environment, not every Windows installation, CPU architecture, OS, Node version or future package release. Platform runtime libraries and compatible binaries must still be available.
+```json
+{
+  "name": "Wireless Mouse",
+  "description": "Bluetooth mouse",
+  "price": 1499.5,
+  "stock": 10
+}
+```
 
-If a supported prebuilt binary cannot load, do not ignore the error or claim the installation succeeded. A source-build installation requires compatible Python and Visual Studio Build Tools with the **Desktop development with C++** workload, including a Windows SDK, followed by `npm ci` and the same smoke tests. That complete source-build procedure was **not** successfully tested in this environment. Other platforms need separate verification.
+**Validation:** name required; price must be non-negative; stock must be a non-negative safe integer; product IDs must be positive safe integers. Invalid input returns `400`.
 
-SQLite creates `products.db` automatically in the working directory. Always start from the project folder. Startup performs additive, repeatable migrations, including `users.token_version INTEGER NOT NULL DEFAULT 0`, without deleting users or products. Back up an existing database before deploying migrations. Never delete a database to apply an update. Tokens created before the token-version release require a fresh login; users and passwords are preserved.
+### Authentication & recovery
 
-Shopify credentials are currently required at startup, even for local-only use. For isolated offline testing use synthetic placeholders and a mocked Shopify transport; never send those placeholders to Shopify. For real integration, install your authorized app on a development store in the same Shopify organization, grant `read_products` and `write_products`, and configure its client ID/secret. Client credentials authentication is for same-organization stores. See [Shopify authentication documentation](https://shopify.dev/docs/apps/build/authentication-authorization/client-credentials-grant?lang=node).
-
-## Endpoints
-
-| Method | Endpoint | Access / purpose |
+| Method | Route | Purpose |
 |---|---|---|
-| GET | `/` | Public server status |
-| POST | `/products` | JWT; create local product |
-| GET | `/products` | Public local product list |
-| GET | `/products/:id` | Public local product lookup |
-| PUT | `/products/:id` | JWT; replace local product fields |
-| DELETE | `/products/:id` | JWT; delete local product |
-| POST | `/auth/signup` | Register |
-| POST | `/auth/login` | Obtain JWT |
-| POST | `/auth/forgot-password` | Request development recovery |
-| POST | `/auth/reset-password` | Consume single-use token |
-| GET | `/shopify/products` | JWT; first 20 Shopify products |
-| POST | `/shopify/products` | JWT; create DRAFT product |
-| PUT | `/shopify/products/:id` | JWT; update title/description |
-| DELETE | `/shopify/products/:id` | JWT; delete product |
+| `POST` | `/auth/signup` | Register a user — `201` |
+| `POST` | `/auth/login` | Authenticate and obtain JWT — `200` |
+| `POST` | `/auth/forgot-password` | Request a reset token |
+| `POST` | `/auth/reset-password` | Use a fresh, single-use token |
 
-Signup body: `{"name":"Reviewer","email":"reviewer@example.com","password":"ChooseYourOwnPassword"}`. Login uses `email` and `password`. Copy the returned JWT into `Authorization: Bearer <jwt_token>`. Passwords require at least 8 characters and at most 72 UTF-8 bytes. Local create/update body: `{"name":"Example","description":"Optional description","price":12.5,"stock":3}`. Price must be nonnegative, stock a nonnegative safe integer, and local IDs positive safe integers.
+Signup body:
 
-Shopify create/update accepts `title` and `description`; update needs at least one. URL IDs are the numeric suffix of `gid://shopify/Product/<id>`. Local SQLite products and Shopify products are independent. Shopify prices, variants, inventory, pagination beyond 20, and publishing are not implemented.
+```json
+{
+  "name": "Demo User",
+  "email": "demo@example.com",
+  "password": "UseYourOwnStrongPassword"
+}
+```
 
-## Development-only password reset
+For protected routes, provide the token returned by login:
 
-No email delivery is implemented. The generic forgot-password response records a request and does not claim that email was sent. Production responses never include generated reset tokens; generated tokens are never logged in any environment.
+```http
+Authorization: Bearer <jwt_token>
+```
 
-For a private local session, set process environment variables in PowerShell before starting the server:
+Passwords must contain at least 8 characters and no more than 72 UTF-8 bytes. Reset tokens expire after **15 minutes**; successful reset also invalidates all older JWTs through a database-backed token version.
+
+### Shopify products
+
+| Method | Route | Auth | Operation |
+|---|---|---|---|
+| `GET` | `/shopify/products` | JWT | Retrieve first 20 products |
+| `POST` | `/shopify/products` | JWT | Create product in **DRAFT** status |
+| `PUT` | `/shopify/products/:id` | JWT | Update title and/or description |
+| `DELETE` | `/shopify/products/:id` | JWT | Delete product |
+
+Example creation body:
+
+```json
+{
+  "title": "Wireless Keyboard",
+  "description": "A demo product created using the Shopify GraphQL Admin API"
+}
+```
+
+Shopify URLs take the numeric suffix of a product GraphQL ID such as `gid://shopify/Product/<id>`. This project does **not** manage Shopify prices, variants, inventory, publishing, or pagination beyond the first 20 products.
+
+## 🧪 Postman Testing
+
+Import **both** files from `postman/`:
+
+1. `My Collection.postman_collection.json` — the **one** API collection named **Node Development Test - Clean Review**.
+2. `Local Review.postman_environment.json` — an environment **template**, not a second collection.
+
+Select the imported environment and set `base_url` to `http://127.0.0.1:3000`.
+
+**Local assessment:** the collection generates disposable signup credentials, saves the login JWT, creates a local product, captures its ID, and tests CRUD, input errors, and conditional password recovery. Run only against an **isolated test database**: it creates a user and a product, then deletes its own test product.
+
+**Shopify — manual opt-in only:** requests are disabled by default. Set `run_shopify_reads=true` for an authorized GET. Each permitted write requires setting `allow_shopify_mutations=true` immediately beforehand; Postman resets the flag to `false`. Run mutations **one at a time** against disposable products, never as an unattended collection.
+
+> 🔒 The environment template contains blank credential placeholders. Never publish populated environment exports containing emails/passwords, JWTs, reset tokens, or IDs.
+
+## 🔐 Security & Reliability
+
+- **bcrypt:** stores password hashes, never plaintext passwords.
+- **JWT:** signed HS256 tokens protect write APIs; reset invalidates previously issued tokens using `token_version`.
+- **SQL placeholders:** parameterized statements reduce SQL injection risk.
+- **Validation:** rejects invalid product bodies and identifiers.
+- **Logging:** records method and URL before parsing; redacts all query-string values and does not log request bodies or auth headers.
+- **Rate limiting:** fixed 15-minute per-IP window for auth POST requests.
+- **Shopify resilience:** safe upstream errors, 10-second timeouts, handling for throttle/unavailability, and no automatic write retries.
+
+| Auth endpoint | Attempts per IP / 15 min |
+|---|---:|
+| Signup | 20 |
+| Login | 30 |
+| Forgot password | 10 |
+| Reset password | 20 |
+
+Responses include `200` (success), `201` (created), `400` (invalid), `401` (unauthorized), `404` (missing), `409` (duplicate email), `413` (oversized body), and `429` (rate limited). Shopify upstream errors can return `502`, `503`, or `504` as appropriate.
+
+### Development-only reset-token testing
+
+**Recovery email delivery is not implemented.** For a local, private development session only, enable the controlled reset-token response before starting the server:
 
 ```powershell
 $env:NODE_ENV = 'development'
@@ -76,43 +268,51 @@ $env:ALLOW_DEV_RESET_TOKEN = 'true'
 node server.js
 ```
 
-Only exact development mode, explicit `true`, and a loopback request allow `resetToken` in the response. Use `http://127.0.0.1:3000`. Do not enable this behind a publicly accessible proxy. `.env.example` disables it by default; Postman settings do not set server environment variables.
+Only requests from the local loopback interface can receive a development `resetToken` when **both** settings are explicitly enabled. Use `http://127.0.0.1:3000`. Never use this mode behind a public proxy or in production. Reset tokens are hashed in SQLite, expire after 15 minutes, and cannot be reused.
 
-1. POST `/auth/forgot-password` with `{"email":"reviewer@example.com"}`.
-2. In the opted-in local response, use the fresh `resetToken` in POST `/auth/reset-password`: `{"token":"<fresh_token>","newPassword":"ChooseAnotherPassword"}`.
-3. Tokens expire after 15 minutes and cannot be reused. A new request invalidates previous reset tokens.
-4. Successful reset atomically changes the password and increments the user's token version. **All earlier JWTs receive 401 on protected endpoints.** Public product reads remain public.
-5. Login with the new password to obtain a working JWT. The old password no longer works.
+## ✅ Verification
 
-## Postman
+The project was checked through scripted API validation and local verification, including **18 local Postman requests and 59 passing assertions** in the reported run, SQLite/bcrypt native smoke tests, and package dependency auditing. These are verification results for the tested environment, not a guarantee of universal deployment compatibility.
 
-Import `postman/My Collection.postman_collection.json` (v2.1) and `postman/Local Review.postman_environment.json`. Select the Local Review environment and set `base_url`. Run **Local assessment** against a test database: it generates a disposable user, obtains a JWT, tests CRUD, deletes its own product, and tests recovery, old JWT rejection and new JWT authorization. Existing products are not deliberately selected, but the run creates an account; use an isolated test database. With local reset opt-in disabled, dependent recovery checks skip instead of passing.
+Useful manual commands:
 
-The collection uses `{{jwt_token}}`, `{{reset_token}}` and captured product IDs. Authentication endpoints override bearer auth with No Auth. Exported credential placeholders are blank. Never share an environment after testing without clearing credentials, tokens and IDs.
+```powershell
+node --check server.js
+node --check database.js
+node --check shopify.js
+node --check request-security.js
+node --check test-shopify.js
+npm audit --omit=dev
+```
 
-All Shopify requests skip by default. Set `run_shopify_reads=true` only for authorized reads. For **each individually approved** Shopify mutation, set `allow_shopify_mutations=true`; the pre-request guard consumes the opt-in and resets it to false. Update/delete require a numeric `shopify_product_id`, ideally from an approved disposable create. Never run live writes unattended. Test mocks do not prove live write permissions or results.
+`npm test` remains a placeholder; the regression checks were run using an **external assessment harness**, not a committed `npm test` suite. `test-shopify.js` verifies live authentication/read only. Shopify write behavior was exercised earlier during development, but was **not reverified live after the final security changes**.
 
-## Logging, rate limits and errors
+## 🧭 Roadmap / Known Limitations
 
-Method and URL are logged before rate limiting and JSON parsing, including malformed JSON and oversized requests. Query parameter names remain visible; **all query values are redacted**, including unfamiliar credential names. Request bodies and authorization headers are not logged. Do not put credentials in URL path segments.
+This project is a learning-oriented backend demonstration. Potential next steps:
 
-All POST attempts, including malformed input and successful requests, count per IP and endpoint in a 15-minute fixed window:
+- [ ] Add email delivery for password recovery.
+- [ ] Add finer-grained product ownership and role-based authorization.
+- [ ] Introduce database-level integer stock constraints and suitable monetary representation.
+- [ ] Use shared, distributed rate limiting for multi-instance deployments.
+- [ ] Add a frontend or embedded merchant interface.
+- [ ] Add comprehensive in-repository automated tests and CI.
+- [ ] Extend Shopify support to variants, prices, inventory, pagination, and publishing.
 
-| Endpoint | Attempts per window |
-|---|---:|
-| `/auth/signup` | 20 |
-| `/auth/login` | 30 |
-| `/auth/forgot-password` | 10 |
-| `/auth/reset-password` | 20 |
+Current limits include **public local product reads**, shared write privileges for authenticated users, an **in-memory IP-based limiter**, no merchant UI, and no production reset email. Existing SQLite schema accepts fractional stock from direct database writes, although the API rejects it.
 
-Excess attempts receive 429 and `Retry-After` in seconds. One complete Postman run stays below these limits; repeated runs can hit the limit. Wait for the window rather than disabling protection on a public service. State is bounded to 10,000 IP/endpoint buckets and expired entries are cleaned up. At capacity, new buckets are rejected temporarily. State is per-process and resets at restart: production multi-instance deployments need a shared limiter and additional account-based abuse controls. Express does not trust arbitrary forwarded-IP headers; configure trusted proxies deliberately before deployment. Users behind one NAT share limits.
+## 📦 Safe Sharing
 
-Status codes: 200 success, 201 created, 400 invalid input, 401 invalid/expired/revoked JWT, 404 absent resource/route, 409 duplicate email, 413 excessive body, 429 local auth limit, 500 unexpected internal failure. Shopify connection/protocol failures return 502; Shopify HTTP throttling/unavailability and GraphQL THROTTLED return 503 with Retry-After; a 10-second upstream timeout returns 504. No automatic write retries occur. Product existence is read before update/delete and checked again after mutation errors, so ordinary field validation remains 400 rather than being mislabeled 404. A 404 indicates no product visible to the authorized Shopify client; insufficient upstream permission is treated as an upstream error. [Shopify error reference](https://shopify.dev/docs/api/usage/response-codes).
+Commit source files, `README.md`, `.env.example`, lockfile, and the **two safe Postman JSON templates**. Do **not** publish `.env`, local `.db` files, `node_modules/`, credentials, reset tokens, or populated Postman environments. A Git ignore rule does not automatically exclude files from ZIPs you create manually.
 
-## Verification and submission scope
+---
 
-Use `node --check server.js`, `node --check database.js`, `node --check shopify.js`, `node --check request-security.js`, and `node --check test-shopify.js`. Run the Postman local folder and `npm audit --omit=dev`. `npm test` is still the original placeholder, not an automated test suite. `test-shopify.js` performs a live read/auth check and prints product data; it does not test writes. The external audit harness uses temporary databases and mocked Shopify responses. Live authentication/read were verified in the earlier audit; live create/update/delete remain unverified.
+<div align="center">
 
-Before any later approved ZIP, include source (including `request-security.js`), README, package.json, package-lock.json, .env.example, .gitignore and both clean Postman exports. Exclude `.env`, node_modules, private databases and sidecars, populated token environments, logs and audit/backup artifacts. `.gitignore` does not filter a manually created ZIP. No final ZIP or submission email is part of this correction phase.
+### 🌱 Built beyond the comfort zone
 
-Remaining production limitations include no reset email, public local product reads, shared product privileges for all registered users, an in-memory IP-only limiter, no merchant UI, and SQLite floating-point prices. The API rejects fractional stock, but the existing SQLite table does not enforce integer storage directly. These are documented scope limits, not silently added features.
+*New technologies can be intimidating. This project was a reminder that learning begins when you decide to try anyway.*
+
+**Made with curiosity, persistence, and lots of debugging.** 💙
+
+</div>
